@@ -20,6 +20,13 @@ apply plugin: 'java'
 apply plugin: 'net.minecraftforge.gradle'
 apply plugin: 'maven-publish'
 
+repositories {
+	maven {
+		name = 'Fabric'
+		url = 'https://maven.fabricmc.net/'
+	}
+}
+
 archivesBaseName = "mixin-transmogrifier-${minecraft_version}"
 
 minecraft {
