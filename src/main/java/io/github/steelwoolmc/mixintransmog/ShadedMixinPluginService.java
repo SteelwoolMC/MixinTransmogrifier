@@ -23,6 +23,7 @@ import static io.github.steelwoolmc.mixintransmog.Constants.LOG;
  */
 public class ShadedMixinPluginService implements ILaunchPluginService {
 	private static final Path debugOutFolder = FMLPaths.getOrCreateGameRelativePath(Path.of(".transmog_debug"));
+	private static final String MIXIN_CONFIG_PLUGIN = "shadowignore/org/spongepowered/asm/mixin/extensibility/IMixinConfigPlugin";
 
 	@Override
 	public String name() {
@@ -41,12 +42,16 @@ public class ShadedMixinPluginService implements ILaunchPluginService {
 				classNode.visibleAnnotations != null ? classNode.visibleAnnotations.stream() : Stream.empty(),
 				classNode.invisibleAnnotations != null ? classNode.invisibleAnnotations.stream() : Stream.empty()
 		);
-		if (annotations.noneMatch(annotation -> annotation.desc.equals("Lshadowignore/org/spongepowered/asm/mixin/Mixin;"))) {
+		if (annotations.noneMatch(annotation -> annotation.desc.startsWith("Lshadowignore/org/spongepowered/"))) {
 			if (classNode.name.contains("Mixin")) {
-				System.out.println(classNode.name);
-				System.out.println(classNode.visibleAnnotations.stream().map(annotationNode -> annotationNode.desc).collect(Collectors.joining("\n")));
+//				System.out.println(classNode.name);
+				if (classNode.visibleAnnotations != null) {
+//					System.out.println(classNode.visibleAnnotations.stream().map(annotationNode -> annotationNode.desc).collect(Collectors.joining("\n")));
+				}
 			}
-			return false;
+			if (classNode.interfaces != null && classNode.interfaces.stream().noneMatch(MIXIN_CONFIG_PLUGIN::equals)) {
+				return false;
+			}
 		}
 		LOG.debug("Processing mixin class: " + classNode.name);
 		var duplicateNode = new ClassNode();
@@ -60,12 +65,30 @@ public class ShadedMixinPluginService implements ILaunchPluginService {
 			}
 		});
 		classNode.accept(remapper);
+		classNode.version = duplicateNode.version;
+		classNode.access = duplicateNode.access;
+		classNode.name = duplicateNode.name;
+		classNode.signature = duplicateNode.signature;
+		classNode.superName = duplicateNode.superName;
+		classNode.interfaces = duplicateNode.interfaces;
+		classNode.sourceFile = duplicateNode.sourceFile;
+		classNode.sourceDebug = duplicateNode.sourceDebug;
+		classNode.module = duplicateNode.module;
+		classNode.outerClass = duplicateNode.outerClass;
+		classNode.outerMethod = duplicateNode.outerMethod;
+		classNode.outerMethodDesc = duplicateNode.outerMethodDesc;
 		classNode.visibleAnnotations = duplicateNode.visibleAnnotations;
 		classNode.invisibleAnnotations = duplicateNode.invisibleAnnotations;
 		classNode.visibleTypeAnnotations = duplicateNode.visibleTypeAnnotations;
 		classNode.invisibleTypeAnnotations = duplicateNode.invisibleTypeAnnotations;
-		classNode.methods = duplicateNode.methods;
+		classNode.attrs = duplicateNode.attrs;
+		classNode.innerClasses = duplicateNode.innerClasses;
+		classNode.nestHostClass = duplicateNode.nestHostClass;
+		classNode.nestMembers = duplicateNode.nestMembers;
+		classNode.permittedSubclasses = duplicateNode.permittedSubclasses;
+		classNode.recordComponents = duplicateNode.recordComponents;
 		classNode.fields = duplicateNode.fields;
+		classNode.methods = duplicateNode.methods;
 		var writer = new ClassWriter(0);
 		classNode.accept(writer);
 		try {

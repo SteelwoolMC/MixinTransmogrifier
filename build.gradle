@@ -15,6 +15,10 @@ repositories {
 group = 'io.github.steelwoolmc'
 version = version + '+' + minecraft_version
 
+java {
+    withSourcesJar()
+}
+
 minecraft {
     mappings channel: 'official', version: minecraft_version
 }

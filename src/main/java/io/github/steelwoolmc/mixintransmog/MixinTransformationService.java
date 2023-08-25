@@ -7,13 +7,16 @@ import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.ITransformationService;
 import cpw.mods.modlauncher.api.ITransformer;
 import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import org.spongepowered.asm.launch.MixinBootstrap;
 import org.spongepowered.asm.launch.MixinLaunchPlugin;
 import org.spongepowered.asm.launch.MixinLaunchPluginLegacy;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -69,13 +72,19 @@ public class MixinTransformationService implements ITransformationService {
 
         try {
             Field handlerField = Launcher.class.getDeclaredField("transformationServicesHandler");
+            handlerField.setAccessible(true);
             Object handler = handlerField.get(Launcher.INSTANCE);
             Field serviceLookupField = handler.getClass().getDeclaredField("serviceLookup");
+            serviceLookupField.setAccessible(true);
             Map<String, TransformationServiceDecorator> serviceLookup = (Map) serviceLookupField.get(handler);
             Constructor<TransformationServiceDecorator> ctr = TransformationServiceDecorator.class.getDeclaredConstructor(ITransformationService.class);
             ctr.setAccessible(true);
+            TransformationServiceDecorator decorator = ctr.newInstance(new DummyMixinTransformationService());
+            Method onLoad = TransformationServiceDecorator.class.getDeclaredMethod("onLoad", IEnvironment.class, Set.class);
+            onLoad.setAccessible(true);
+            onLoad.invoke(decorator, env, otherServices);
             // Silently replace service, avoiding a ConcurrentModificationException
-            serviceLookup.put("mixin", ctr.newInstance(new DummyMixinTransformationService()));
+            serviceLookup.put("mixin", decorator);
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
@@ -107,6 +116,15 @@ public class MixinTransformationService implements ITransformationService {
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public List<Resource> beginScanning(IEnvironment environment) {
+        // Add mixin remapper after the naming service has been initialized
+        if (!FMLEnvironment.production) {
+            MixinEnvironment.getDefaultEnvironment().getRemappers().add(new MixinModlauncherRemapper());
+        }
+        return List.of();
     }
 
     @Override
