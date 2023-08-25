@@ -15,7 +15,7 @@ import java.util.EnumSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.github.steelwoolmc.mixintransmog.Constants.Log;
+import static io.github.steelwoolmc.mixintransmog.Constants.LOG;
 
 /**
  * A launch plugin that transforms mod mixin classes to refer to shaded mixin rather than the original
@@ -23,6 +23,7 @@ import static io.github.steelwoolmc.mixintransmog.Constants.Log;
  */
 public class ShadedMixinPluginService implements ILaunchPluginService {
 	private static final Path debugOutFolder = FMLPaths.getOrCreateGameRelativePath(Path.of(".transmog_debug"));
+
 	@Override
 	public String name() {
 		return "mixin-transmogrifier";
@@ -47,8 +48,7 @@ public class ShadedMixinPluginService implements ILaunchPluginService {
 			}
 			return false;
 		}
-		// TODO change this back to debug
-		Log.info("Processing mixin class: " + classNode.name);
+		LOG.debug("Processing mixin class: " + classNode.name);
 		var duplicateNode = new ClassNode();
 		var remapper = new ClassRemapper(duplicateNode, new Remapper() {
 			@Override

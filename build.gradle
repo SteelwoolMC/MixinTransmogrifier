@@ -1,103 +1,81 @@
-buildscript {
-    repositories {
-        maven { url = 'https://maven.minecraftforge.net' }
-        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
-		maven {
-			name = 'Fabric'
-			url = 'https://maven.fabricmc.net/'
-		}
-        mavenCentral()
-    }
-    dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1.+', changing: true
-    }
-}
-
 plugins {
-	id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'java'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '5.1.+'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
-apply plugin: 'java'
-apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'maven-publish'
 
 repositories {
-	maven {
-		name = 'Fabric'
-		url = 'https://maven.fabricmc.net/'
-	}
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
 }
 
-archivesBaseName = "mixin-transmogrifier-${minecraft_version}"
+group = 'io.github.steelwoolmc'
+version = version + '+' + minecraft_version
 
 minecraft {
     mappings channel: 'official', version: minecraft_version
 }
 
 configurations {
-	shadedImplementation
-	shadedImplementation.transitive = false
-	implementation.extendsFrom(shadedImplementation)
+    shadedImplementation { transitive = false }
+    implementation.extendsFrom(shadedImplementation)
 }
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-	shadedImplementation "net.bytebuddy:byte-buddy-agent:1.14.5"
-	shadedImplementation "net.fabricmc:sponge-mixin:0.12.5+mixin.0.8.5"
+    shadedImplementation "net.fabricmc:sponge-mixin:${mixin_version}"
 }
 
 jar {
-	archiveClassifier = "slim"
+    archiveClassifier = "slim"
 }
+
 shadowJar {
-	dependencies {
-		exclude "META-INF/services/**"
-		// Exclude dependency licenses since we include them ourselves
-		exclude "**/LICENSE*"
-		exclude "**/NOTICE*"
-	}
+    from("licenses") {
+        into "META-INF/"
+    }
+    from("LICENSE.txt") {
+        into "META-INF/"
+    }
+    // Exclude dependency licenses since we include them ourselves
+    exclude "**/LICENSE*"
+    exclude "**/NOTICE*"
+    // Relocate mixin packages
+    relocate "org.spongepowered", "io.github.steelwoolmc.shadow.spongepowered"
+    relocate "shadowignore.org.spongepowered", "org.spongepowered"
+    // Relocate service files
+    mergeServiceFiles {
+        // Remove mixin's transformation service
+        exclude "META-INF/services/cpw.mods.modlauncher.api.ITransformationService"
+    }
+    // Remove mixin's launch plugin service
+    exclude "META-INF/services/cpw.mods.modlauncher.serviceapi.ILaunchPluginService"
 
-	relocate "net.bytebuddy.agent", "io.github.steelwoolmc.shadow.bytebuddy.agent"
-	relocate "org.spongepowered", "io.github.steelwoolmc.shadow.spongepowered"
-	relocate "shadowignore.org.spongepowered", "org.spongepowered"
-
-	archiveClassifier = 'shadow-temp'
-	configurations = [project.configurations.shadedImplementation]
-	finalizedBy "postShadow"
-}
-
-// Hack to ignore the services from shadowed mixin, since they don't get relocated
-tasks.register("postShadow", Jar) {
-	archiveClassifier = ""
-	dependsOn shadowJar
-	from("src/main/resources") {
-		include "META-INF/services/**"
-	}
-	from("licenses") {
-		into "META-INF/"
-	}
-	from("LICENSE.txt") {
-		into "META-INF/"
-	}
-	from zipTree(shadowJar.archiveFile.get())
-	finalizedBy "reobfShadowJar"
-}
-
-// Used to access the main built jar from the dummy project, so that we can run Steelwool in a development environment
-configurations {
-	mainJar {
-		canBeConsumed = true
-		canBeResolved = false
-	}
-}
-
-artifacts {
-	mainJar(shadowJar)
+    archiveClassifier = ""
+    configurations = [project.configurations.shadedImplementation]
 }
 
 assemble.dependsOn shadowJar
 
-reobf {
-	shadowJar {}
+// Replace published jar artifact with shadowJar 
+configurations {
+    [runtimeElements, apiElements].each {
+        it.outgoing {
+            artifacts.clear()
+            artifact(shadowJar)
+        }
+    }
 }
 
-jar.finalizedBy('reobfJar')
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            // Remove forge dependency from pom, disable gradle module metadata
+            fg.component it
+        }
+    }
+}
