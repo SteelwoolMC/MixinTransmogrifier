@@ -32,8 +32,10 @@ public class MixinTransformationService implements ITransformationService {
      */
     private static void replaceMixinLaunchPlugin() {
         try {
-            // This is a hack to get our shaded mixin to behave properly, as otherwise it tries to uses the thread classloader and then fails to load things
-            // TODO what are the consequences of this? seems like it could potentially have rather bad unintended consequences
+            // In production, mixin transmogrifier is loaded from the SERVICE layer and mixin requires access to its classes
+            // in order to function properly, so we change the context classloader from BOOT to SERVICE accordingly.
+            // Shouldn't break anything thanks to module layer inheritance
+            // @see org.spongepowered.asm.service.modlauncher.ModLauncherClassProvider
             var classLoader = MixinTransformationService.class.getClassLoader();
             Thread.currentThread().setContextClassLoader(classLoader);
 
