@@ -51,6 +51,15 @@ public class ShadedMixinPluginService implements ILaunchPluginService {
 				}
 				return super.map(internalName);
 			}
+
+			@Override
+			public Object mapValue(Object value) {
+				if (value instanceof String str && str.startsWith("shadowignore.org.spongepowered")) {
+					hasMapped.set(true);
+					return "org.spongepowered" + str.substring("shadowignore.org.spongepowered".length());
+				}
+				return super.mapValue(value);
+			}
 		});
 		classNode.accept(remapper);
 		if (!hasMapped.get()) {
