@@ -12,8 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumSet;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.github.steelwoolmc.mixintransmog.Constants.LOG;
 
@@ -23,7 +22,6 @@ import static io.github.steelwoolmc.mixintransmog.Constants.LOG;
  */
 public class ShadedMixinPluginService implements ILaunchPluginService {
 	private static final Path debugOutFolder = FMLPaths.getOrCreateGameRelativePath(Path.of(".transmog_debug"));
-	private static final String MIXIN_CONFIG_PLUGIN = "shadowignore/org/spongepowered/asm/mixin/extensibility/IMixinConfigPlugin";
 
 	@Override
 	public String name() {
@@ -37,34 +35,28 @@ public class ShadedMixinPluginService implements ILaunchPluginService {
 
 	@Override
 	public boolean processClass(final Phase phase, ClassNode classNode, final Type classType, String reason) {
-		if (phase != Phase.BEFORE) return false;
-		var annotations = Stream.concat(
-				classNode.visibleAnnotations != null ? classNode.visibleAnnotations.stream() : Stream.empty(),
-				classNode.invisibleAnnotations != null ? classNode.invisibleAnnotations.stream() : Stream.empty()
-		);
-		if (annotations.noneMatch(annotation -> annotation.desc.startsWith("Lshadowignore/org/spongepowered/"))) {
-			if (classNode.name.contains("Mixin")) {
-//				System.out.println(classNode.name);
-				if (classNode.visibleAnnotations != null) {
-//					System.out.println(classNode.visibleAnnotations.stream().map(annotationNode -> annotationNode.desc).collect(Collectors.joining("\n")));
-				}
-			}
-			if (classNode.interfaces != null && classNode.interfaces.stream().noneMatch(MIXIN_CONFIG_PLUGIN::equals)) {
-				return false;
-			}
+		if (phase != Phase.BEFORE) {
+			return false;
 		}
+
 		LOG.debug("Processing mixin class: " + classNode.name);
-		var duplicateNode = new ClassNode();
-		var remapper = new ClassRemapper(duplicateNode, new Remapper() {
+		ClassNode duplicateNode = new ClassNode();
+		AtomicBoolean hasMapped = new AtomicBoolean(false);
+		ClassRemapper remapper = new ClassRemapper(duplicateNode, new Remapper() {
 			@Override
 			public String map(String internalName) {
 				if (internalName.startsWith("shadowignore/org/spongepowered")) {
+					hasMapped.set(true);
 					return "org/spongepowered" + internalName.substring("shadowignore/org/spongepowered".length());
 				}
 				return super.map(internalName);
 			}
 		});
 		classNode.accept(remapper);
+		if (!hasMapped.get()) {
+			return false;
+		}
+
 		classNode.version = duplicateNode.version;
 		classNode.access = duplicateNode.access;
 		classNode.name = duplicateNode.name;
@@ -89,12 +81,14 @@ public class ShadedMixinPluginService implements ILaunchPluginService {
 		classNode.recordComponents = duplicateNode.recordComponents;
 		classNode.fields = duplicateNode.fields;
 		classNode.methods = duplicateNode.methods;
-		var writer = new ClassWriter(0);
+
+		ClassWriter writer = new ClassWriter(0);
 		classNode.accept(writer);
+
 		try {
 			Files.write(debugOutFolder.resolve(classNode.name.replace("/", ".") + ".class"), writer.toByteArray());
 		} catch (IOException e) {
-			e.printStackTrace();
+			LOG.error("Error exporting transmog output", e);
 		}
 		return true;
 	}

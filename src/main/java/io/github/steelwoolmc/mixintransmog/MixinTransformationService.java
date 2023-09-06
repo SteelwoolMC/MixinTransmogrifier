@@ -4,6 +4,7 @@ import cpw.mods.modlauncher.LaunchPluginHandler;
 import cpw.mods.modlauncher.Launcher;
 import cpw.mods.modlauncher.TransformationServiceDecorator;
 import cpw.mods.modlauncher.api.IEnvironment;
+import cpw.mods.modlauncher.api.IModuleLayerManager;
 import cpw.mods.modlauncher.api.ITransformationService;
 import cpw.mods.modlauncher.api.ITransformer;
 import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
@@ -124,7 +125,7 @@ public class MixinTransformationService implements ITransformationService {
         if (!FMLEnvironment.production) {
             MixinEnvironment.getDefaultEnvironment().getRemappers().add(new MixinModlauncherRemapper());
         }
-        return List.of();
+        return List.of(new Resource(IModuleLayerManager.Layer.GAME, List.of(new GeneratedMixinClassesSecureJar())));
     }
 
     @Override
